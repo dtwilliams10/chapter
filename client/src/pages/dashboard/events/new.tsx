@@ -1,2 +1,2 @@
-import { NewEventPage } from '../../../modules/dashboard/Events';
+import { NewEventPage } from '../../../modules/dashboard/Events/';
 export default NewEventPage;

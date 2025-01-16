@@ -1,71 +1,83 @@
-import React, { useState } from 'react';
-import { NextPage } from 'next';
-
-import Layout from '../../shared/components/Layout';
-import Skeleton from '../components/Skeleton';
-import VenueForm, { VenueFormData } from '../components/VenueForm';
 import { useRouter } from 'next/router';
-import { useVenueQuery, useUpdateVenueMutation } from '../../../../generated';
-import { getId } from '../../../../helpers/getId';
-import { makeStyles } from '@material-ui/core';
-import { VENUES } from '../graphql/queries';
+import React, { ReactElement } from 'react';
+import NextError from 'next/error';
 
-const useStyles = makeStyles(() => ({
-  responseDiv: {
-    margin: '15px 0',
-  },
-}));
+import {
+  useVenueQuery,
+  useUpdateVenueMutation,
+  useChapterQuery,
+} from '../../../../generated/graphql';
 
-export const EditVenuePage: NextPage = () => {
-  const [loadingUpdate, setLoadingUpdate] = useState(false);
+import { DashboardLoading } from '../../shared/components/DashboardLoading';
+import VenueForm from '../components/VenueForm';
+import { parseVenueData, VenueFormData } from '../components/VenueFormUtils';
+import { DASHBOARD_VENUE, DASHBOARD_VENUES } from '../graphql/queries';
+import { useAlert } from '../../../../hooks/useAlert';
+import { useParam } from '../../../../hooks/useParam';
+import { NextPageWithLayout } from '../../../../pages/_app';
+import { DashboardLayout } from '../../../dashboard/shared/components/DashboardLayout';
 
-  const styles = useStyles();
+export const EditVenuePage: NextPageWithLayout = () => {
   const router = useRouter();
-  const id = getId(router.query) || -1;
+  const { param: venueId } = useParam('venueId');
+  const { param: chapterId } = useParam('id');
 
-  const { loading, error, data } = useVenueQuery({ variables: { id } });
-  const [updateVenue] = useUpdateVenueMutation({
-    refetchQueries: [{ query: VENUES }],
+  const { data: chapterData, error: chapterError } = useChapterQuery({
+    variables: { chapterId },
   });
 
-  const onSubmit = async (data: VenueFormData) => {
-    setLoadingUpdate(true);
-    try {
-      const latitude = parseFloat(String(data.latitude));
-      const longitude = parseFloat(String(data.longitude));
+  const { data: venueData, error: venueError } = useVenueQuery({
+    variables: { venueId },
+  });
 
-      await updateVenue({
-        variables: { id, data: { ...data, latitude, longitude } },
-      });
+  const [updateVenue] = useUpdateVenueMutation({
+    refetchQueries: [
+      { query: DASHBOARD_VENUE, variables: { venueId } },
+      { query: DASHBOARD_VENUES },
+    ],
+  });
+
+  const addAlert = useAlert();
+
+  const onSubmit = async (data: VenueFormData) => {
+    const { data: venueData, errors } = await updateVenue({
+      variables: {
+        venueId,
+        chapterId: data.chapter_id,
+        data: parseVenueData(data),
+      },
+    });
+    if (errors) throw errors;
+    if (venueData) {
       await router.push('/dashboard/venues');
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoadingUpdate(false);
+      addAlert({
+        title: `Venue "${venueData?.updateVenue.name}" updated successfully!`,
+        status: 'success',
+      });
     }
   };
 
-  if (loading || error || !data?.venue) {
-    return (
-      <Layout>
-        <Skeleton>
-          <h1>{loading ? 'Loading...' : 'Error...'}</h1>
-          {error && <div className={styles.responseDiv}>{error}</div>}
-        </Skeleton>
-      </Layout>
-    );
-  }
+  const hasLoaded = !!venueData && !!chapterData;
+  const errors: Error[] = [];
+  if (venueError) errors.push(venueError);
+  if (chapterError) errors.push(chapterError);
+
+  if (!hasLoaded || errors.length) return <DashboardLoading errors={errors} />;
+  if (!venueData.venue || !chapterData.chapter)
+    return <NextError statusCode={404} title={'Page not found'} />;
 
   return (
-    <Layout>
-      <Skeleton>
-        <VenueForm
-          data={data}
-          loading={loadingUpdate}
-          onSubmit={onSubmit}
-          submitText={'Update venue'}
-        />
-      </Skeleton>
-    </Layout>
+    <VenueForm
+      data={venueData}
+      chapterData={chapterData}
+      onSubmit={onSubmit}
+      submitText={'Save Venue Changes'}
+      chapterId={chapterId}
+      loadingText={'Saving Venue Changes'}
+    />
   );
+};
+
+EditVenuePage.getLayout = function getLayout(page: ReactElement) {
+  return <DashboardLayout dataCy="edit-venue-page">{page}</DashboardLayout>;
 };

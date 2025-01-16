@@ -1,65 +1,42 @@
-import React, { useState } from 'react';
-import { useRouter } from 'next/router';
-import { NextPage } from 'next';
-import { EventFormData } from '../components/EventFormUtils';
-import Layout from '../../shared/components/Layout';
-import Skeleton from '../../Venues/components/Skeleton';
+import NextError from 'next/error';
+import React, { ReactElement } from 'react';
+
+import { DashboardLayout } from '../../shared/components/DashboardLayout';
 import EventForm from '../components/EventForm';
-import { useCreateEventMutation } from '../../../../generated';
-import { EVENTS } from '../graphql/queries';
+import { EventFormData } from '../components/EventFormUtils';
+import { NextPageWithLayout } from '../../../../pages/_app';
+import { useUser } from '../../../auth/user';
+import { useCreateEvent } from '../../../../hooks/useCreateEvent';
 
-export const NewEventPage: NextPage = () => {
-  const router = useRouter();
-  const [loading, setLoading] = useState<boolean>(false);
+export const NewEventPage: NextPageWithLayout<{
+  chapterId?: number;
+}> = ({ chapterId }) => {
+  const createEvent = useCreateEvent();
 
-  const [createEvent] = useCreateEventMutation({
-    refetchQueries: [{ query: EVENTS }],
-  });
+  const { user } = useUser();
+  const chapter = user?.admined_chapters.find(({ id }) => id === chapterId);
+  if ((chapterId && !chapter) || !user?.admined_chapters.length) {
+    return <NextError statusCode={403} title="Access denied" />;
+  }
 
-  const onSubmit = async (data: EventFormData) => {
-    // TODO: load chapter from url or something like that
-    setLoading(true);
-
-    try {
-      const HARD_CODE = { chapterId: 1 };
-
-      console.log(data.start_at);
-
-      const eventData = {
-        ...data,
-        capacity: parseInt(String(data.capacity)),
-        start_at: new Date(data.start_at).toISOString(),
-        ends_at: new Date(data.ends_at).toISOString(),
-        ...HARD_CODE,
-        tags: undefined,
-      };
-
-      const event = await createEvent({
-        variables: { data: { ...eventData } },
-      });
-
-      if (event.data) {
-        router.replace(
-          `/dashboard/events/[id]`,
-          `/dashboard/events/${event.data.createEvent.id}`,
-        );
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const onSubmit = async (data: EventFormData) =>
+    await createEvent({
+      data,
+      success: (eventName) => `Event "${eventName}" created!`,
+    });
 
   return (
-    <Layout>
-      <Skeleton>
-        <EventForm
-          loading={loading}
-          onSubmit={onSubmit}
-          submitText={'Add event'}
-        />
-      </Skeleton>
-    </Layout>
+    <EventForm
+      chapter={chapter}
+      formType="new"
+      header="Create Event"
+      loadingText="Adding Event"
+      onSubmit={onSubmit}
+      submitText="Add event"
+    />
   );
+};
+
+NewEventPage.getLayout = function getLayout(page: ReactElement) {
+  return <DashboardLayout>{page}</DashboardLayout>;
 };

@@ -1,6 +1,5 @@
 {
   "compilerOptions": {
-    "allowJs": true,
     "alwaysStrict": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
@@ -8,10 +7,9 @@
     "jsx": "preserve",
     "lib": ["dom", "es2017"],
     "baseUrl": "./src/",
-    "paths": {     
-     "src/*": [
-      "./src/*"
-    ],},
+    "paths": {
+      "src/*": ["./src/*"]
+    },
     "module": "commonjs",
     "moduleResolution": "node",
     "noEmit": true,
@@ -21,8 +19,12 @@
     "resolveJsonModule": true,
     "skipLibCheck": true,
     "strict": true,
-    "target": "esnext"
+    "target": "esnext",
+    "allowJs": true,
+    "incremental": true,
+    "strictPropertyInitialization": false,
+    "experimentalDecorators": true
   },
   "exclude": ["node_modules"],
-  "include": ["**/*.ts", "**/*.tsx"]
+  "include": ["**/*.ts", "**/*.tsx", "../common/**/*.ts"]
 }

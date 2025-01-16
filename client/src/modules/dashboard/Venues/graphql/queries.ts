@@ -1,9 +1,10 @@
 import { gql } from '@apollo/client';
 
-export const VENUES = gql`
-  query venues {
-    venues {
+export const DASHBOARD_VENUES = gql`
+  query dashboardVenues {
+    dashboardVenues {
       id
+      chapter_id
       name
       street_address
       city
@@ -12,13 +13,17 @@ export const VENUES = gql`
       country
       latitude
       longitude
+      chapter {
+        id
+        name
+      }
     }
   }
 `;
 
-export const VENUE = gql`
-  query venue($id: Int!) {
-    venue(id: $id) {
+export const DASHBOARD_VENUE = gql`
+  query venue($venueId: Int!) {
+    venue(venueId: $venueId) {
       id
       name
       street_address
@@ -28,38 +33,22 @@ export const VENUE = gql`
       country
       latitude
       longitude
-    }
-  }
-`;
-
-export const createVenue = gql`
-  mutation createVenue($data: CreateVenueInputs!) {
-    createVenue(data: $data) {
-      id
-      name
-      street_address
-      city
-      postal_code
-      region
-      country
-      latitude
-      longitude
-    }
-  }
-`;
-
-export const updateVenue = gql`
-  mutation updateVenue($id: Int!, $data: UpdateVenueInputs!) {
-    updateVenue(id: $id, data: $data) {
-      id
-      name
-      street_address
-      city
-      postal_code
-      region
-      country
-      latitude
-      longitude
+      chapter {
+        id
+        name
+        events {
+          id
+          name
+          canceled
+          invite_only
+        }
+      }
+      venue_tags {
+        tag {
+          id
+          name
+        }
+      }
     }
   }
 `;

@@ -1,120 +1,98 @@
-import React from 'react';
-import { NextPage } from 'next';
+import { Heading, Text, Flex, Tooltip } from '@chakra-ui/react';
+import { LockIcon } from '@chakra-ui/icons';
+import NextError from 'next/error';
 import { useRouter } from 'next/router';
-import { Card, Typography, CardContent } from '@material-ui/core';
+import React, { ReactElement } from 'react';
 
-import Layout from '../../shared/components/Layout';
-import Skeleton from '../../Venues/components/Skeleton';
-import { useEventQuery } from '../../../../generated';
-import { getId } from '../../../../helpers/getId';
-import { ProgressCardContent } from '../../../../components';
-import getLocationString from '../../../../helpers/getLocationString';
+import { useDashboardEventQuery } from '../../../../generated/graphql';
+import { useParam } from '../../../../hooks/useParam';
+import { formatDate } from '../../../../util/date';
+import { DashboardLoading } from '../../shared/components/DashboardLoading';
+import { DashboardLayout } from '../../shared/components/DashboardLayout';
 import Actions from '../components/Actions';
+import { EventUsers } from '../components/EventUsers';
+import { EventVenue } from '../components/EventVenue';
+import { LinkField, TextField } from '../components/Fields';
+import SponsorsCard from '../../../../components/SponsorsCard';
+import { TagsBox } from '../../../../components/TagsBox';
+import { NextPageWithLayout } from '../../../../pages/_app';
 
-export const EventPage: NextPage = () => {
+export const EventPage: NextPageWithLayout = () => {
   const router = useRouter();
-  const id = getId(router.query) || -1;
-  const { loading, error, data } = useEventQuery({ variables: { id } });
+  const { param: eventId } = useParam('id');
 
-  if (loading || error || !data || !data.event) {
-    return (
-      <Layout>
-        <Skeleton>
-          <h1>
-            {loading
-              ? 'Loading...'
-              : !error
-              ? "Can't find event :("
-              : 'Error...'}
-          </h1>
-        </Skeleton>
-      </Layout>
-    );
-  }
+  const { loading, error, data } = useDashboardEventQuery({
+    variables: { eventId },
+  });
+
+  const isLoading = loading || !data;
+  if (isLoading || error) return <DashboardLoading error={error} />;
+  if (!data.dashboardEvent)
+    return <NextError statusCode={404} title="Event not found" />;
+
+  const startAt = formatDate(data.dashboardEvent.start_at);
+  const endAt = formatDate(data.dashboardEvent.ends_at);
+  const { id: chapterId, name: chapterName } = data.dashboardEvent.chapter;
 
   return (
-    <Layout>
-      <Skeleton>
-        <Card style={{ marginTop: '12px' }}>
-          <ProgressCardContent>
-            <Typography gutterBottom variant="h5" component="h2">
-              {data.event.name}
-            </Typography>
-            {data.event.canceled && (
-              <Typography variant="h5" color="error">
-                Canceled
-              </Typography>
-            )}
-            <Typography variant="body2" color="textSecondary" component="p">
-              {data.event.description}
-            </Typography>
-            {data.event.url && (
-              <Typography>
-                Event Url: <a href={data.event.url}>{data.event.url}</a>
-              </Typography>
-            )}
-            {data.event.video_url && (
-              <Typography>
-                Video Url:{' '}
-                <a href={data.event.video_url}>{data.event.video_url}</a>
-              </Typography>
-            )}
-            <Typography variant="body2" color="textSecondary" component="p">
-              {data.event.capacity}
-            </Typography>
-            {/* <Tags tags={data.event.tags} /> */}
+    <>
+      <Flex
+        p="2"
+        borderWidth="1px"
+        borderRadius="lg"
+        gap={'3'}
+        flexDirection="column"
+      >
+        <Flex alignItems="center">
+          {data.dashboardEvent.invite_only && (
+            <Tooltip label="Invite only">
+              <LockIcon fontSize="2xl" />
+            </Tooltip>
+          )}
+          <Heading as="h1">{data.dashboardEvent.name}</Heading>
+        </Flex>
 
-            <Actions
-              event={data.event}
-              onDelete={() => router.replace('/dashboard/events')}
-            />
-            {data.event.venue ? (
-              <>
-                <h2>Venue:</h2>
-                <h1 style={{ padding: 0 }}>{data.event.venue.name}</h1>
-                <h4>{getLocationString(data.event.venue, true)}</h4>
-              </>
-            ) : (
-              <h2>Venue: Online</h2>
-            )}
-          </ProgressCardContent>
-        </Card>
-        <Card style={{ marginTop: '12px' }}>
-          <CardContent>
-            <h2>RSVPs:</h2>
-            {data.event.rsvps.length > 0 ? (
-              <div>
-                <ul>
-                  {data.event.rsvps
-                    .filter((rsvp) => !rsvp.on_waitlist)
-                    .map((rsvp) => (
-                      <li key={rsvp.id}>
-                        {rsvp.user
-                          ? `${rsvp.user.first_name} ${rsvp.user.last_name}`
-                          : `#${rsvp.id}`}
-                      </li>
-                    ))}
-                </ul>
-                <br />
-                <h3>On waiting list</h3>
-                <ul>
-                  {data.event.rsvps
-                    .filter((rsvp) => rsvp.on_waitlist)
-                    .map((rsvp) => (
-                      <li key={rsvp.id}>
-                        {rsvp.user
-                          ? `${rsvp.user.first_name} ${rsvp.user.last_name}`
-                          : `#${rsvp.id}`}
-                      </li>
-                    ))}
-                </ul>
-              </div>
-            ) : (
-              <h3>No rsvps</h3>
-            )}
-          </CardContent>
-        </Card>
-      </Skeleton>
-    </Layout>
+        {data.dashboardEvent.canceled && (
+          <Text fontWeight={500} fontSize={'md'} color="red.500">
+            Canceled
+          </Text>
+        )}
+        {!!data.dashboardEvent.event_tags.length && (
+          <TagsBox tags={data.dashboardEvent.event_tags} />
+        )}
+        <Text fontSize={'md'}>{data.dashboardEvent.description}</Text>
+        {data.dashboardEvent.image_url && (
+          <LinkField label="Event Image Url" isExternal>
+            {data.dashboardEvent.image_url}
+          </LinkField>
+        )}
+        {data.dashboardEvent.url && (
+          <LinkField label="Event Url" isExternal>
+            {data.dashboardEvent.url}
+          </LinkField>
+        )}
+        <TextField label="Capacity">{data.dashboardEvent.capacity}</TextField>
+        <TextField label="Starting">{startAt}</TextField>
+        <TextField label="Ending">{endAt}</TextField>
+        <LinkField label="Event By" href={`/dashboard/chapters/${chapterId}`}>
+          {chapterName}
+        </LinkField>
+        <EventVenue event={data.dashboardEvent} />
+        <Actions
+          event={data.dashboardEvent}
+          chapter={data.dashboardEvent.chapter}
+          onDelete={() => router.replace('/dashboard/events')}
+        />
+      </Flex>
+
+      {!!data.dashboardEvent.sponsors.length && (
+        <SponsorsCard sponsors={data.dashboardEvent.sponsors} />
+      )}
+      <EventUsers event={data.dashboardEvent} />
+    </>
   );
+};
+
+EventPage.getLayout = function getLayout(page: ReactElement) {
+  return <DashboardLayout>{page}</DashboardLayout>;
 };

@@ -1,47 +1,30 @@
-import React, { useState } from 'react';
-import { NextPage } from 'next';
+import NextError from 'next/error';
+import React, { ReactElement } from 'react';
 
-import Layout from '../../shared/components/Layout';
-import Skeleton from '../components/Skeleton';
-import VenueForm, { VenueFormData } from '../components/VenueForm';
-import { useRouter } from 'next/router';
-import { useCreateVenueMutation } from '../../../../generated';
-import { VENUES } from '../graphql/queries';
+import { DashboardLayout } from '../../shared/components/DashboardLayout';
+import VenueForm from '../components/VenueForm';
 
-export const NewVenuePage: NextPage = () => {
-  const [loading, setLoading] = useState(false);
-  const router = useRouter();
+import { NextPageWithLayout } from '../../../../pages/_app';
+import { useSubmitVenue } from '../utils';
+import { useUser } from '../../../auth/user';
 
-  const [createVenue] = useCreateVenueMutation({
-    refetchQueries: [{ query: VENUES }],
-  });
+export const NewVenuePage: NextPageWithLayout = () => {
+  const { user } = useUser();
 
-  const onSubmit = async (data: VenueFormData) => {
-    setLoading(true);
-    try {
-      const latitude = parseFloat(String(data.latitude));
-      const longitude = parseFloat(String(data.longitude));
+  const onSubmit = useSubmitVenue();
 
-      await createVenue({
-        variables: { data: { ...data, latitude, longitude } },
-      });
-      router.replace('/dashboard/venues');
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  if (!user) return <NextError statusCode={403} title="Log in required" />;
 
   return (
-    <Layout>
-      <Skeleton>
-        <VenueForm
-          loading={loading}
-          onSubmit={onSubmit}
-          submitText={'Add venue'}
-        />
-      </Skeleton>
-    </Layout>
+    <VenueForm
+      adminedChapters={user.admined_chapters}
+      onSubmit={onSubmit}
+      submitText={'Add venue'}
+      loadingText={'Adding venue'}
+    />
   );
+};
+
+NewVenuePage.getLayout = function getLayout(page: ReactElement) {
+  return <DashboardLayout>{page}</DashboardLayout>;
 };
